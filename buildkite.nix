@@ -1,0 +1,118 @@
+{ pkgs, lib, config, ... }:
+
+let
+  inherit (lib) types;
+
+  # Ensure that our steps and commands match 1:1.
+  # Put steps in an unsorted list, with their priority attached.
+  # Add fields we want to calculate for buildkite (command and step key).
+  evaledSteps =
+    let
+      evalStep = key: step:
+        {
+          # Keep priority (needed for sorting)
+          inherit (step) priority;
+          # Inject fields we want to calculate for buildkite
+          config = step.config // {
+            step_key = key;
+            command = config.commandBuilder key;
+          };
+        };
+    in
+    lib.mapAttrsToList evalStep config.steps;
+
+  # Sort by priority
+  sortedSteps = builtins.sort (p: q: p.priority < q.priority) evaledSteps;
+  # Remove the priority, just taking the final buildkite-formatted steps
+  finalSteps = builtins.map (s: s.config) sortedSteps;
+
+  # TODO: crawl self.packages.${system}, self.${devShells}.system,
+  # self.nixosConfigurations (filtered), etc.
+  # Will probably want to refactor into another file
+  derivsToBuild = [
+    {
+      path = ".#packages.${pkgs.system}.hello";
+      # Not sure if this would ever not be /nix/store/?
+      hash = (pkgs.lib.removePrefix "/nix/store/" pkgs.hello.outPath);
+    }
+  ];
+in
+{
+  options = {
+    commandBuilder = lib.mkOption {
+      type = types.functionTo types.str;
+      # TODO: This assumes the CLI tool is always going to be in scope? Do not
+      # think I can refer to inputs of a flake
+      default = (stepKey: "nix run .#ci.config.commandTargets.${stepKey}");
+    };
+
+    steps = lib.mkOption {
+      type = types.attrsOf
+        (types.submodule {
+          options = {
+            priority = lib.mkOption {
+              type = (types.ints.between 0 100);
+              default = 50;
+              description = ''
+                Priority of this step (relative to all configured steps)
+              '';
+            };
+
+            config = lib.mkOption {
+              # TODO: Not sure if I want to use the type system to validate
+              # buildkite steps
+              type = types.attrs;
+              description = ''
+                Config to add to uploaded buildkite pipeline
+                (will have step_key overridden)
+              '';
+            };
+          };
+        });
+
+      default = { };
+    };
+
+    commands = lib.mkOption {
+      # type = types.attrsOf types.str;
+      # type = types.attrsOf types.attrs;
+      default = { };
+      type = types.attrs;
+      description = ''
+        Commands to execute on the agent, should match 1:1 with steps above.
+        Substitute deps in here to depend on them!
+      '';
+    };
+
+    evaluation = {
+      steps = lib.mkOption {
+        type = types.listOf types.attrs;
+        default = [ ];
+        description = ''
+          Raw steps to upload to buildkite
+        '';
+      };
+
+      builds = lib.mkOption {
+        type = types.attrsOf types.attrs;
+        description = ''
+          Contains metadata for all top-level derivations to build
+        '';
+      };
+    };
+
+    commandTargets = lib.mkOption {
+      type = types.attrsOf types.package;
+      default = { };
+      description = ''
+        Targets built for running CI commands
+      '';
+    };
+  };
+
+  config = {
+    evaluation.steps = finalSteps;
+    commandTargets =
+      lib.mapAttrs (key: cmd: pkgs.writeScriptBin "run-${key}.sh" cmd) config.commands;
+  };
+}
