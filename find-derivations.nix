@@ -4,20 +4,29 @@ let
   inherit (pkgs) lib system;
   nullOr = first: second: if first != null then first else second;
 
-  fmtDeriv = { deriv, tag }: {
-    inherit tag;
-    name = deriv.pname or deriv.name;
-    path = deriv.outPath;
-  };
+  fmtDeriv = { deriv, name, tag }:
+    let
+      derivName = if deriv ? pname then deriv.pname else deriv.name;
+      name' = if derivName == "nix-shell" then name else derivName;
+    in
+    {
+      inherit tag;
+      name = name';
+      path = deriv.outPath;
+    };
 
   mapSet = typeName:
     (name: value: lib.nameValuePair "${typeName}-${name}" (fmtDeriv value));
 
   mapPackage = { name, value, tag, typeName }:
     let
-      data = fmtDeriv { inherit tag; deriv = value; };
+      key = "${typeName}-${name}";
+      data = fmtDeriv { inherit name tag; deriv = value; };
     in
-    lib.nameValuePair "${typeName}-${name}" data;
+    lib.nameValuePair key data;
+
+  devShells' = if self ? devShells then self.devShells else { };
+  devShells = if devShells' ? "${system}" then devShells'.${system} else { };
 
   packages' = if self ? packages then self.packages else { };
   sysPackages = if packages' ? ${system} then packages'.${system} else { };
@@ -43,9 +52,21 @@ let
     nixosConfigs';
 
   darwinConfigs = lib.mapAttrs'
-    (name: value: mapPackage { })
+    (name: value: mapPackage {
+      inherit name value;
+      tag = "darwinConfigurations.${name}.system";
+      typeName = "darwin";
+    })
     (if self ? darwinConfigurations then self.darwinConfigurations else { });
+
+  devShellConfigs = lib.mapAttrs'
+    (name: value: mapPackage {
+      inherit name value;
+      tag = "devShells.${system}.${name}";
+      typeName = "devshell";
+    })
+    devShells;
 in
 {
-  evaluation.builds = packages // nixosConfigs // darwinConfigs;
+  evaluation.builds = packages // devShellConfigs // nixosConfigs // darwinConfigs;
 }

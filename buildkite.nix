@@ -1,6 +1,7 @@
 { pkgs, lib, config, ... }:
 
 let
+  inherit (pkgs) system;
   inherit (lib) types;
 
   # Ensure that our steps and commands match 1:1.
@@ -26,12 +27,9 @@ let
   # Remove the priority, just taking the final buildkite-formatted steps
   finalSteps = builtins.map (s: s.config) sortedSteps;
 
-  # TODO: crawl self.packages.${system}, self.${devShells}.system,
-  # self.nixosConfigurations (filtered), etc.
-  # Will probably want to refactor into another file
   derivsToBuild = [
     {
-      path = ".#packages.${pkgs.system}.hello";
+      path = ".#packages.${system}.hello";
       # Not sure if this would ever not be /nix/store/?
       hash = (pkgs.lib.removePrefix "/nix/store/" pkgs.hello.outPath);
     }
@@ -43,7 +41,7 @@ in
       type = types.functionTo types.str;
       # TODO: This assumes the CLI tool is always going to be in scope? Do not
       # think I can refer to inputs of a flake
-      default = (stepKey: "nix run .#ci.config.commandTargets.${stepKey}");
+      default = (stepKey: "nix run .#ci.${system}.config.commandTargets.${stepKey}");
     };
 
     steps = lib.mkOption {
