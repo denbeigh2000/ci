@@ -4,27 +4,48 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, crane }:
     let
-      pkg = import ./.;
       systems = [ "aarch64-darwin" "x86_64-linux" ];
+      inherit (import ./.) mkMkCIConfig;
     in
     {
-      lib = { inherit (pkg) mkMkCIConfig; };
+      lib = { };
     } // (flake-utils.lib.eachSystem systems (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        pkg = import ./.;
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        };
 
-        mkCIConfig = pkg.mkMkCIConfig { inherit pkgs nixpkgs system self; };
+        rustToolchain = pkgs.rust-bin.stable.latest.default;
+        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+        mkCIConfig = mkMkCIConfig { inherit self pkgs; };
       in
       {
-        ci = mkCIConfig {
-          imports = [ ./example.nix ];
+        devShells.default = pkgs.mkShell {
+          packages = [ rustToolchain ];
         };
 
         packages.hello = pkgs.hello;
+
+        ci = mkCIConfig
+          {
+            imports = [ ./example.nix ];
+          };
       }));
 }
