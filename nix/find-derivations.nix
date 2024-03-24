@@ -70,3 +70,4 @@ in
 {
   evaluation.builds = packages // devShellConfigs // nixosConfigs // darwinConfigs;
 }
+

@@ -21,7 +21,7 @@
   outputs = { self, nixpkgs, flake-utils, rust-overlay, crane }:
     let
       systems = [ "aarch64-darwin" "x86_64-linux" ];
-      inherit (import ./.) mkMkCIConfig;
+      inherit (import ./nix) mkMkCIConfig;
     in
     {
       lib = { };
