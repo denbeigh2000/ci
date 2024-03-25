@@ -15,7 +15,7 @@ let
           inherit (step) priority;
           # Inject fields we want to calculate for buildkite
           config = step.config // {
-            step_key = key;
+            inherit key;
             command = config.commandBuilder key;
           };
         };
@@ -62,7 +62,7 @@ in
               type = types.attrs;
               description = ''
                 Config to add to uploaded buildkite pipeline
-                (will have step_key overridden)
+                (will have key overridden)
               '';
             };
           };
