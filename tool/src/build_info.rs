@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::buildkite::Step;
 use crate::flags::BuildkiteArgs;
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -21,12 +22,10 @@ const SYSTEM: &str = "x86_64-linux";
 
 #[derive(Deserialize)]
 pub struct FoundDerivationBuild {
-    name: String,
-    path: PathBuf,
-    tag: String,
+    pub name: String,
+    pub path: PathBuf,
+    pub tag: String,
 }
-
-pub type BuildkiteStep = serde_json::Value;
 
 #[derive(Deserialize, Serialize)]
 struct PipelineInfo {
@@ -37,7 +36,7 @@ struct PipelineInfo {
 #[derive(Deserialize)]
 pub struct BuildEvaluation {
     pub builds: HashMap<String, FoundDerivationBuild>,
-    pub steps: Vec<BuildkiteStep>,
+    pub steps: Vec<Step>,
 }
 
 #[derive(thiserror::Error, Debug)]

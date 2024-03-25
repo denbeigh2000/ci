@@ -54,7 +54,7 @@ impl CliArgs {
 
 #[derive(Subcommand)]
 pub enum Action {
-    Capture,
+    Collect,
     Evaluate,
     Execute {
         #[arg(short)]
