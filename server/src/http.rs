@@ -7,57 +7,66 @@
 //  - POST /derivation-builds
 //    Record new derivation builds in the database
 
-use axum::body::Bytes;
-use axum::extract::State;
+use axum::body::Body;
+use axum::extract::{Json, State};
 use axum::http::{Response, StatusCode};
+use axum::response::IntoResponse;
 
-use bb8::Pool;
-use bb8_postgres::PostgresConnectionManager;
-use tokio_postgres::NoTls;
+use crate::store::{BuildRecord, Store, StoreError};
 
 #[derive(Clone)]
 pub struct AppState {
-    pool: Pool<PostgresConnectionManager<NoTls>>,
+    store: Store,
 }
 
 impl AppState {
-    pub fn new(pool: Pool<PostgresConnectionManager<NoTls>>) -> Self {
-        Self { pool }
+    pub fn new(store: Store) -> Self {
+        Self { store }
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum HTTPHandlingError {
-    #[error("connection timeout")]
-    ConnectionTimeout,
     #[error("db error: {0}")]
-    DBConnectionError(tokio_postgres::Error),
+    StoreError(#[from] StoreError),
 }
 
-impl Into<Response<Bytes>> for HTTPHandlingError {
-    fn into(self) -> Response<Bytes> {
+impl IntoResponse for HTTPHandlingError {
+    fn into_response(self) -> axum::response::Response {
         let b = match self {
-            Self::ConnectionTimeout => {
-                Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR)
-            }
-            Self::DBConnectionError(e) => {
-                Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR)
-            }
+            Self::StoreError(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR),
         };
 
-        b.body(Bytes::new()).unwrap()
+        b.body(Body::empty()).unwrap()
     }
 }
 
 // TODO: retrieve body from request
-async fn handle_get(State(state): State<AppState>) -> Result<Response<Bytes>, HTTPHandlingError> {
-    let conn = match state.pool.get().await {
-        Ok(conn) => Ok(conn),
-        Err(bb8::RunError::TimedOut) => Err(HTTPHandlingError::ConnectionTimeout),
-        Err(bb8::RunError::User(e)) => Err(HTTPHandlingError::DBConnectionError(e)),
-    }?;
+pub async fn handle_get(
+    State(mut state): State<AppState>,
+    Json(body): Json<Vec<String>>,
+) -> Result<Json<Vec<BuildRecord>>, HTTPHandlingError> {
+    let results = state.store.query(&body).await?;
 
-    unimplemented!()
+    Ok(Json(results))
+}
+
+pub async fn handle_post(
+    State(mut state): State<AppState>,
+    Json(body): Json<BuildRecord>,
+) -> Result<(), HTTPHandlingError> {
+    state.store.insert_start(&body).await?;
+
+    Ok(())
+}
+
+pub async fn handle_put(
+    State(mut state): State<AppState>,
+    Json(body): Json<BuildRecord>,
+) -> Result<(), HTTPHandlingError> {
+    state.store.mark_finish(&body).await?;
+
+    Ok(())
 }
 
 // TODO: handle_post, handle_put

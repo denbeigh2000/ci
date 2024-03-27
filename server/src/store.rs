@@ -1,9 +1,8 @@
-use std::{convert::Infallible, ops::Deref, task::Wake};
-
-use axum::http::Uri;
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::{DateTime, Utc};
+use postgres_from_row::FromRow;
+use serde::{Deserialize, Serialize};
 use tokio_postgres::NoTls;
 
 const FIND_DERIV_QUERY: &str = r#"
@@ -47,11 +46,13 @@ WHERE
 ;
 "#;
 
+#[derive(FromRow, Serialize, Deserialize)]
 pub struct BuildRecord {
-    hash: Hash,
-    build_url: Uri,
+    hash: String,
+    build_id: String,
+    build_url: String,
     started_at: DateTime<Utc>,
-    finshed_at: Option<DateTime<Utc>>,
+    finished_at: Option<DateTime<Utc>>,
     success: Option<bool>,
 }
 
@@ -61,8 +62,28 @@ pub struct Hash([char; 33]);
 
 pub struct Query(Vec<Hash>);
 
+#[derive(Clone)]
 pub struct Store {
     pool: PostgresPool,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum StoreError {
+    #[error("timed out waiting for DB connection")]
+    ConnectionTimeout,
+    #[error("error interacting with DB: {0}")]
+    DatabaseError(#[from] tokio_postgres::Error),
+    #[error("No matching entries were found to update")]
+    UpdateMissingEntry,
+}
+
+impl From<bb8::RunError<tokio_postgres::Error>> for StoreError {
+    fn from(value: bb8::RunError<tokio_postgres::Error>) -> Self {
+        match value {
+            bb8::RunError::User(e) => StoreError::DatabaseError(e),
+            bb8::RunError::TimedOut => StoreError::ConnectionTimeout,
+        }
+    }
 }
 
 impl Store {
@@ -71,17 +92,49 @@ impl Store {
     }
 
     // TODO: finish
-    pub async fn query(&mut self, derivs: &[Hash]) -> Result<(), Infallible> {
-        let conn = self.pool.get().await.unwrap();
-        let v: Vec<String> = derivs.iter().map(|i| String::from_iter(i.0)).collect();
-        conn.query(FIND_DERIV_QUERY, &[&v]);
+    pub async fn query(&mut self, derivs: &[String]) -> Result<Vec<BuildRecord>, StoreError> {
+        let conn = self.pool.get().await?;
+        let rows = conn.query(FIND_DERIV_QUERY, &[&derivs]).await?;
 
-        unimplemented!()
+        let records = rows.iter().map(BuildRecord::from_row).collect();
+        Ok(records)
     }
 
-    // TODO
-    // async fn create(&mut self, records: &[InitialRecord]) -> Result<...> {
+    pub async fn insert_start(&mut self, record: &BuildRecord) -> Result<(), StoreError> {
+        // TODO: insert en masse?
+        let conn = self.pool.get().await?;
+        conn.execute(
+            INSERT_DERIV_QUERY,
+            &[
+                &record.hash,
+                &record.build_url,
+                &record.build_id,
+                &record.started_at,
+            ],
+        )
+        .await?;
 
-    // TODO
-    // async fn finish(&mut self, records: &[FinishedRecord]) -> Result<...> {
+        Ok(())
+    }
+
+    pub async fn mark_finish(&mut self, record: &BuildRecord) -> Result<(), StoreError> {
+        let conn = self.pool.get().await?;
+        let res = conn
+            .execute(
+                UPDATE_DERIV_FINISHED_QUERY,
+                &[
+                    &record.started_at,
+                    &record.finished_at,
+                    &record.success,
+                    &record.hash,
+                    &record.build_id,
+                ],
+            )
+            .await?;
+
+        match res {
+            0 => Err(StoreError::UpdateMissingEntry),
+            1.. => Ok(()),
+        }
+    }
 }

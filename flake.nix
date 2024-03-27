@@ -38,7 +38,11 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = [ pkgs.pkg-config pkgs.openssl pkgs.libgit2 ];
+          buildInputs = [
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+          ];
           packages = [ rustToolchain ];
         };
 
