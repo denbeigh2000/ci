@@ -6,7 +6,7 @@ mod command;
 mod trigger;
 
 pub use command::CommandStep;
-pub use trigger::{TriggerBuildSpec, TriggerStep};
+pub use trigger::TriggerStep;
 
 // NOTE: only supporting what we need here. Unfortunately, the buildkite client
 // library and JSON-Schema codegen ecosystems in rust are both....limited.
@@ -77,8 +77,10 @@ pub struct BlockStep {
     /// Label of the block step
     block: String,
     blocked_state: BlockState,
+    #[serde(skip_serializing_if = "Option::is_none")]
     depends_on: Option<Vec<String>>,
     // TODO: fields?
+    #[serde(skip_serializing_if = "Option::is_none")]
     label: Option<String>,
 }
 
@@ -86,6 +88,7 @@ pub struct BlockStep {
 pub struct WaitStep {
     allow_dependency_failure: bool,
     continue_on_failure: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     depends_on: Option<Vec<String>>,
     key: String,
 }
@@ -132,5 +135,6 @@ impl WaitStepBuilder {
 #[derive(Deserialize, Serialize)]
 pub struct Pipeline {
     steps: Vec<Step>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     env: Option<HashMap<String, String>>,
 }

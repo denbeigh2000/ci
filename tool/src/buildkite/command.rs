@@ -4,15 +4,25 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_TIMEOUT_MINUTES: u16 = 20;
 
+fn default_timeout() -> u16 {
+    DEFAULT_TIMEOUT_MINUTES
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct CommandStep {
+    #[serde(default)]
     allow_depdendency_failure: bool,
     command: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     concurrency_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     depends_on: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     env: Option<HashMap<String, String>>,
     key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     label: Option<String>,
+    #[serde(default = "default_timeout")]
     timeout_in_minutes: u16,
 }
 

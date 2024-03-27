@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::path::Path;
 use std::process::Command;
 
 use build_info::{CIRunStateWriteToFileError, EvaluationError};
@@ -42,10 +41,10 @@ fn capture_buildkite_state(args: BuildkiteArgs) -> Result<(), CaptureError> {
     let path = args.path.clone();
 
     let state = CIRunState::from_args(args);
-    let state_file_path = Path::new("./nix/build-info.json");
-    state.write_to_file(state_file_path)?;
+    let state_file_path = path.join("./nix/build-info.json");
+    state.write_to_file(&state_file_path)?;
 
-    create_commit(&path, state_file_path)?;
+    create_commit(&path, &state_file_path)?;
     upload_patch()?;
 
     Ok(())
@@ -67,11 +66,17 @@ fn apply(args: &BuildkiteArgs) -> Result<(), ApplyError> {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum EvaluateError {
+enum DerivePipelineError {
     #[error("error capturing CI state in git: {0}")]
     CapturingGitState(#[from] CaptureError),
     #[error("error evaluating CI state: {0}")]
     EvaluatingState(#[from] EvaluationError),
+}
+
+#[derive(thiserror::Error, Debug)]
+enum EvaluateError {
+    #[error("error deriving pipeline: {0}")]
+    Deriving(#[from] DerivePipelineError),
     #[error("error encoding pipeline to JSON: {0}")]
     Encoding(#[from] serde_json::Error),
     #[error("error starting `buildkite-agent`: {0}")]
@@ -84,7 +89,8 @@ enum EvaluateError {
     BKAgentExitState(Option<i32>, String),
 }
 
-fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
+// TODO: should this have its' own error type?
+fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, DerivePipelineError> {
     capture_buildkite_state(args.clone())?;
     let eval = BuildEvaluation::from_env(&args.path)?;
 
@@ -127,10 +133,13 @@ fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
     // append one more step to upload state at the end
     steps.push(final_step);
 
-    let pipeline = BuildkitePipeline { steps };
+    Ok(BuildkitePipeline { steps })
+}
+
+fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
+    let pipeline = make_buildkite_pipeline(args)?;
     let json_data = serde_json::to_vec(&pipeline)?;
 
-    // upload them all to buildkite!
     let mut handle = std::process::Command::new("buildkite-agent")
         .args(["pipeline", "upload"])
         .spawn()

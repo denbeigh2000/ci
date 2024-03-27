@@ -103,7 +103,6 @@ impl CIRunState {
             let json_data = json_digest::canonical_json(&json_val).unwrap();
             let mut state_file =
                 File::create(path).map_err(CIRunStateWriteToFileError::Creating)?;
-            // TODO: error
             state_file
                 .write_all(json_data.as_bytes())
                 .map_err(CIRunStateWriteToFileError::Writing)?;

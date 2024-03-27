@@ -11,12 +11,19 @@ pub struct TriggerStep {
 #[derive(Deserialize, Serialize)]
 pub struct TriggerBuildSpec {
     key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     meta_data: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     depends_on: Option<Vec<String>>,
 }
 
