@@ -115,13 +115,13 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
                 "execute".to_string(),
                 v.tag,
             ]);
-            b.set_label(format!("build {}", v.name));
+            b.set_label(format!(":hammer_and_wrench: build {}", v.name));
             Step::Command(b.build(k, args))
         })
         .collect();
 
     let mut b = CommandStep::builder();
-    b.set_label(":thinking: collecting results".to_string());
+    b.set_label(":shopping_trolley: collect results".to_string());
     b.set_timeout_in_minutes(3);
 
     // add a wait step so all builds run first (necessary?)
