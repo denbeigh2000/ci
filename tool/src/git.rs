@@ -1,10 +1,8 @@
-use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::str::FromStr;
+use std::{io::Write, path::Path};
 
-lazy_static::lazy_static! {
-    static ref PATCH_PATHBUF: PathBuf = PathBuf::from_str(PATCH_PATH).unwrap();
-}
+#[cfg(debug_assertions)]
+use crate::develop::{print_cmd, IS_DEVELOP_MODE};
 
 const PATCH_PATH: &str = "./ci-data.patch";
 
@@ -17,13 +15,42 @@ pub enum UploadingPatchError {
     InvokingBKAgent(#[from] std::io::Error),
     #[error("error status {0:?} from `buildkite-agent`: {1}")]
     BKAgentStatus(Option<i32>, String),
+    #[error("failed to invoke `git`: {0}")]
+    InvokingGit(std::io::Error),
+    #[error("error status {0:?} from `git`: {1}")]
+    GitStatus(Option<i32>, String),
 }
 
-pub fn upload_patch() -> Result<(), UploadingPatchError> {
-    let upload_result = std::process::Command::new("buildkite-agent")
-        .args(["artifact", "upload", PATCH_PATH])
-        .output()?;
+fn format_patch(repo: &Path) -> Result<Vec<u8>, UploadingPatchError> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["format-patch", "-n1", "--stdout"])
+        .current_dir(repo);
 
+    let output = cmd.output().map_err(UploadingPatchError::InvokingGit)?;
+    if !output.status.success() {
+        let out = String::from_utf8_lossy(&output.stderr).to_string();
+        return Err(UploadingPatchError::GitStatus(output.status.code(), out));
+    }
+
+    Ok(output.stdout)
+}
+
+pub fn upload_patch(repo: &Path) -> Result<(), UploadingPatchError> {
+    let patch_data = format_patch(repo)?;
+    {
+        let mut f = std::fs::File::create(repo.join(PATCH_PATH)).expect("creating file");
+        f.write_all(&patch_data).expect("writing data");
+    }
+
+    let mut cmd = std::process::Command::new("buildkite-agent");
+    cmd.args(["artifact", "upload", PATCH_PATH]);
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("buildkite-agent", &cmd);
+        return Ok(());
+    }
+
+    let upload_result = cmd.output()?;
     if !upload_result.status.success() {
         let out = String::from_utf8_lossy(&upload_result.stderr).to_string();
         return Err(UploadingPatchError::BKAgentStatus(
@@ -48,7 +75,16 @@ pub enum CreateCommitError {
     GitCommitStatus(Option<i32>, String),
 }
 
-pub fn create_commit(repo: &Path, state_file: &Path) -> Result<(), CreateCommitError> {
+fn add_file(repo: &Path, state_file: &Path) -> Result<(), CreateCommitError> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(repo)
+        .args(["add", &state_file.to_string_lossy()]);
+
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("git", &cmd);
+        return Ok(());
+    }
     let res = Command::new("git")
         .current_dir(repo)
         .args(["add", &state_file.to_string_lossy()])
@@ -62,21 +98,37 @@ pub fn create_commit(repo: &Path, state_file: &Path) -> Result<(), CreateCommitE
         ));
     }
 
-    let commit_res = Command::new("git")
-        .current_dir(repo)
+    Ok(())
+}
+
+fn create_commit(repo: &Path) -> Result<(), CreateCommitError> {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(repo)
         .args(["commit", "--message", "automated CI state commit"])
         .env("GIT_COMMITTER_EMAIL", GIT_EMAIL)
-        .env("GIT_COMMITTER_NAME", GIT_NAME)
-        .output()
-        .map_err(CreateCommitError::InvokingGitCommit)?;
+        .env("GIT_COMMITTER_NAME", GIT_NAME);
 
-    if !commit_res.status.success() {
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("git", &cmd);
+        return Ok(());
+    }
+
+    let res = cmd.output().map_err(CreateCommitError::InvokingGitCommit)?;
+
+    if !res.status.success() {
         return Err(CreateCommitError::GitCommitStatus(
-            commit_res.status.code(),
+            res.status.code(),
             String::from_utf8_lossy(&res.stderr).to_string(),
         ));
     }
 
+    Ok(())
+}
+
+pub fn create_state_commit(repo: &Path, state_file: &Path) -> Result<(), CreateCommitError> {
+    add_file(repo, state_file)?;
+    create_commit(repo)?;
     Ok(())
 }
 
@@ -89,10 +141,16 @@ pub enum FetchPatchError {
 }
 
 pub fn fetch_patch() -> Result<(), FetchPatchError> {
-    let output = Command::new("buildkite-agent")
-        .args(["artifact", "download", PATCH_PATH])
-        .output()
-        .map_err(FetchPatchError::InvokingBKAgent)?;
+    let mut cmd = Command::new("buildkite-agent");
+    cmd.args(["artifact", "download", PATCH_PATH]);
+
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("buildkite-agent", &cmd);
+        return Ok(());
+    }
+
+    let output = cmd.output().map_err(FetchPatchError::InvokingBKAgent)?;
 
     let status = output.status;
     if !status.success() {
@@ -112,8 +170,8 @@ pub enum ApplyPatchError {
 }
 
 pub fn apply_patch(repo_path: &Path) -> Result<(), ApplyPatchError> {
-    let output = Command::new("git")
-        .current_dir(repo_path)
+    let mut cmd = Command::new("git");
+    cmd.current_dir(repo_path)
         .args([
             "apply-mailbox",
             PATCH_PATH,
@@ -121,8 +179,15 @@ pub fn apply_patch(repo_path: &Path) -> Result<(), ApplyPatchError> {
         ])
         .env("GIT_COMMITTER_EMAIL", GIT_EMAIL)
         .env("GIT_COMMITTER_NAME", GIT_NAME)
-        .current_dir(repo_path)
-        .output()?;
+        .current_dir(repo_path);
+
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("git", &cmd);
+        return Ok(());
+    }
+
+    let output = cmd.output()?;
 
     if !output.status.success() {
         let code = output.status.code();

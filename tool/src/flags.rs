@@ -55,10 +55,10 @@ impl CliArgs {
 
 #[derive(Subcommand)]
 pub enum Action {
+    /// Collect all results at the end of a CI run.
     Collect,
+    /// Evaluate the derivations to be built for this commit
     Evaluate,
-    Execute {
-        #[arg(short)]
-        target: String,
-    },
+    /// Execute a build target
+    Execute { target: String },
 }

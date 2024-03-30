@@ -4,6 +4,8 @@ use std::process::Command;
 use build_info::{CIRunStateWriteToFileError, EvaluationError};
 use buildkite::WaitStep;
 use clap::Parser;
+#[cfg(debug_assertions)]
+use develop::{print_cmd, IS_DEVELOP_MODE};
 use flags::{Action, BuildkiteArgs};
 use git::{
     apply_patch, fetch_patch, ApplyPatchError, CreateCommitError, FetchPatchError,
@@ -14,11 +16,13 @@ use serde::Serialize;
 use crate::build_info::{BuildEvaluation, CIRunState};
 use crate::buildkite::{CommandStep, Step};
 use crate::flags::CliArgs;
-use crate::git::{create_commit, upload_patch};
+use crate::git::{create_state_commit, upload_patch};
 
 mod build_info;
 #[allow(dead_code)]
 mod buildkite;
+#[cfg(debug_assertions)]
+mod develop;
 mod flags;
 mod git;
 
@@ -44,8 +48,8 @@ fn capture_buildkite_state(args: BuildkiteArgs) -> Result<(), CaptureError> {
     let state_file_path = path.join("./nix/build-info.json");
     state.write_to_file(&state_file_path)?;
 
-    create_commit(&path, &state_file_path)?;
-    upload_patch()?;
+    create_state_commit(&path, &state_file_path)?;
+    upload_patch(&path)?;
 
     Ok(())
 }
@@ -140,10 +144,16 @@ fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
     let pipeline = make_buildkite_pipeline(args)?;
     let json_data = serde_json::to_vec(&pipeline)?;
 
-    let mut handle = std::process::Command::new("buildkite-agent")
-        .args(["pipeline", "upload"])
-        .spawn()
-        .map_err(EvaluateError::InvokingBKAgent)?;
+    let mut cmd = std::process::Command::new("buildkite-agent");
+    cmd.args(["pipeline", "upload"]);
+    #[cfg(debug_assertions)]
+    if *IS_DEVELOP_MODE {
+        print_cmd("buildkite-agent", &cmd);
+        let data = String::from_utf8(json_data).unwrap();
+        println!("data: {data}");
+        return Ok(0);
+    }
+    let mut handle = cmd.spawn().map_err(EvaluateError::InvokingBKAgent)?;
     let mut stdin = handle.stdin.take().unwrap();
     stdin
         .write_all(&json_data)
