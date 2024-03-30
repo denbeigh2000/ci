@@ -5,7 +5,7 @@
     config:
     let
       buildInfoPath = ./build-info.json;
-      buildInfo =
+      event =
         if
           (builtins.pathExists buildInfoPath)
         then
@@ -19,10 +19,9 @@
         # ./github-release.nix
         ./buildkite.nix
         ./find-derivations.nix
-        buildInfo
         config
       ];
 
-      specialArgs = { inherit self pkgs; };
+      specialArgs = { inherit self pkgs event; };
     });
 }
