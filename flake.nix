@@ -4,8 +4,8 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    crane = {
-      url = "github:ipetkov/crane";
+    naersk = {
+      url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -18,7 +18,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, crane }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, naersk }:
     let
       systems = [ "aarch64-darwin" "x86_64-linux" ];
       inherit (import ./nix) mkMkCIConfig;
@@ -33,24 +33,37 @@
         };
 
         rustToolchain = pkgs.rust-bin.stable.latest.default;
-        craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-        mkCIConfig = mkMkCIConfig { inherit self pkgs; };
+        naersk' = pkgs.callPackage naersk {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        };
+        # TODO: improve ux
+        mkCIConfig = mkMkCIConfig {
+          inherit self pkgs;
+        };
+
+        macosRustPkgs = (builtins.attrValues {
+          inherit (pkgs) pkg-config openssl;
+          inherit (pkgs.darwin.apple_sdk.frameworks) SystemConfiguration;
+        });
+        rustPkgs = pkgs.callPackage ./rust.nix {
+          inherit macosRustPkgs;
+          naersk = naersk';
+        };
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = [
-            pkgs.pkg-config
-            pkgs.openssl
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+          buildInputs = macosRustPkgs;
           packages = [ rustToolchain ];
         };
 
-        packages.hello = pkgs.hello;
+        packages = {
+          inherit (pkgs) hello;
+          inherit (rustPkgs) tool server;
+        };
 
-        ci = mkCIConfig
-          {
-            imports = [ ./example.nix ];
-          };
+        ci = mkCIConfig {
+          imports = [ ./example.nix ];
+        };
       }));
 }
