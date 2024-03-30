@@ -12,7 +12,7 @@ fn default_timeout() -> u16 {
 pub struct CommandStep {
     #[serde(default)]
     allow_dependency_failure: bool,
-    command: Vec<String>,
+    command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     concurrency_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,6 +30,14 @@ impl CommandStep {
     pub fn builder() -> CommandStepBuilder {
         CommandStepBuilder::default()
     }
+}
+
+fn format_command(cmd: Vec<String>) -> String {
+    let utf_vec: Vec<_> = cmd
+        .into_iter()
+        .map(|v| String::from_utf8(shell_quote::Bash::quote(&v)).unwrap())
+        .collect();
+    utf_vec.join(" ")
 }
 
 #[derive(Default)]
@@ -80,7 +88,7 @@ impl CommandStepBuilder {
     pub fn build(self, key: String, command: Vec<String>) -> CommandStep {
         CommandStep {
             key,
-            command,
+            command: format_command(command),
             allow_dependency_failure: self.allow_dependency_failure,
             concurrency_group: self.concurrency_group,
             depends_on: self.depends_on,

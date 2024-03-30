@@ -38,10 +38,10 @@ in
 {
   options = {
     commandBuilder = lib.mkOption {
-      type = types.functionTo (types.listOf types.str);
+      type = types.functionTo types.str;
       # TODO: This assumes the CLI tool is always going to be in scope? Do not
       # think I can refer to inputs of a flake
-      default = (stepKey: [ "nix" "run" ".#ci.${system}.config.commandTargets.${stepKey}" ]);
+      default = (stepKey: "nix run .#ci.${system}.config.commandTargets.${stepKey}");
     };
 
     steps = lib.mkOption {
