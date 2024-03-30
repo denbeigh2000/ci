@@ -113,7 +113,7 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
                 ".#tool".to_string(),
                 "--".to_string(),
                 "execute".to_string(),
-                format!(".#{}", v.tag),
+                v.tag,
             ]);
             b.set_label(format!("build {}", v.name));
             Step::Command(b.build(k, args))
