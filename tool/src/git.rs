@@ -142,7 +142,7 @@ pub enum FetchPatchError {
 
 pub fn fetch_patch() -> Result<(), FetchPatchError> {
     let mut cmd = Command::new("buildkite-agent");
-    cmd.args(["artifact", "download", PATCH_PATH]);
+    cmd.args(["artifact", "download", PATCH_PATH, PATCH_PATH]);
 
     #[cfg(debug_assertions)]
     if *IS_DEVELOP_MODE {
