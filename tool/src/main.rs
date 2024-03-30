@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use build_info::{CIRunStateWriteToFileError, EvaluationError};
 use buildkite::WaitStep;
@@ -162,11 +162,14 @@ fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
         println!("data: {data}");
         return Ok(0);
     }
+    cmd.stdin(Stdio::piped());
     let mut handle = cmd.spawn().map_err(EvaluateError::InvokingBKAgent)?;
-    let mut stdin = handle.stdin.take().unwrap();
-    stdin
-        .write_all(&json_data)
-        .map_err(EvaluateError::WritingToBKAgent)?;
+    {
+        let mut stdin = handle.stdin.take().unwrap();
+        stdin
+            .write_all(&json_data)
+            .map_err(EvaluateError::WritingToBKAgent)?;
+    }
 
     let output = handle
         .wait_with_output()
