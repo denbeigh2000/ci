@@ -1,11 +1,10 @@
-{ naersk, macosRustPkgs, lib, stdenvNoCC }:
+{ naersk, buildInputs, stdenvNoCC }:
 
 let
   build = pname: naersk.buildPackage {
-    inherit pname;
+    inherit buildInputs pname;
     src = ./.;
 
-    buildInputs = lib.optional stdenvNoCC.targetPlatform.isDarwin macosRustPkgs;
   };
 
 in

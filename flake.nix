@@ -42,18 +42,23 @@
           inherit self pkgs;
         };
 
-        macosRustPkgs = (builtins.attrValues {
-          inherit (pkgs) pkg-config openssl;
-          inherit (pkgs.darwin.apple_sdk.frameworks) SystemConfiguration;
-        });
+        buildInputs =
+          if pkgs.stdenvNoCC.targetPlatform.isDarwin
+          then
+            (builtins.attrValues {
+              inherit (pkgs) pkg-config openssl;
+              inherit (pkgs.darwin.apple_sdk.frameworks) SystemConfiguration;
+            })
+          else [ ];
+
         rustPkgs = pkgs.callPackage ./rust.nix {
-          inherit macosRustPkgs;
+          inherit buildInputs;
           naersk = naersk';
         };
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = macosRustPkgs;
+          inherit buildInputs;
           packages = [ rustToolchain ];
         };
 
