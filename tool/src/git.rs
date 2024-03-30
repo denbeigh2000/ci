@@ -172,11 +172,7 @@ pub enum ApplyPatchError {
 pub fn apply_patch(repo_path: &Path) -> Result<(), ApplyPatchError> {
     let mut cmd = Command::new("git");
     cmd.current_dir(repo_path)
-        .args([
-            "apply-mailbox",
-            PATCH_FILENAME,
-            "--committer-date-is-author-date",
-        ])
+        .args(["am", PATCH_FILENAME, "--committer-date-is-author-date"])
         .env("GIT_COMMITTER_EMAIL", GIT_EMAIL)
         .env("GIT_COMMITTER_NAME", GIT_NAME)
         .current_dir(repo_path);
