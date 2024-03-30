@@ -4,7 +4,7 @@ use std::{io::Write, path::Path};
 #[cfg(debug_assertions)]
 use crate::develop::{print_cmd, IS_DEVELOP_MODE};
 
-const PATCH_PATH: &str = "./ci-data.patch";
+const PATCH_FILENAME: &str = "ci-data.patch";
 
 const GIT_NAME: &str = "CI Bot";
 const GIT_EMAIL: &str = "ci@denbeigh.cloud";
@@ -38,12 +38,12 @@ fn format_patch(repo: &Path) -> Result<Vec<u8>, UploadingPatchError> {
 pub fn upload_patch(repo: &Path) -> Result<(), UploadingPatchError> {
     let patch_data = format_patch(repo)?;
     {
-        let mut f = std::fs::File::create(repo.join(PATCH_PATH)).expect("creating file");
+        let mut f = std::fs::File::create(repo.join(PATCH_FILENAME)).expect("creating file");
         f.write_all(&patch_data).expect("writing data");
     }
 
     let mut cmd = std::process::Command::new("buildkite-agent");
-    cmd.args(["artifact", "upload", PATCH_PATH]);
+    cmd.args(["artifact", "upload", PATCH_FILENAME]);
     #[cfg(debug_assertions)]
     if *IS_DEVELOP_MODE {
         print_cmd("buildkite-agent", &cmd);
@@ -142,7 +142,7 @@ pub enum FetchPatchError {
 
 pub fn fetch_patch() -> Result<(), FetchPatchError> {
     let mut cmd = Command::new("buildkite-agent");
-    cmd.args(["artifact", "download", PATCH_PATH, PATCH_PATH]);
+    cmd.args(["artifact", "download", PATCH_FILENAME, "."]);
 
     #[cfg(debug_assertions)]
     if *IS_DEVELOP_MODE {
@@ -174,7 +174,7 @@ pub fn apply_patch(repo_path: &Path) -> Result<(), ApplyPatchError> {
     cmd.current_dir(repo_path)
         .args([
             "apply-mailbox",
-            PATCH_PATH,
+            PATCH_FILENAME,
             "--committer-date-is-author-date",
         ])
         .env("GIT_COMMITTER_EMAIL", GIT_EMAIL)
