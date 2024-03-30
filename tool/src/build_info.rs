@@ -56,6 +56,11 @@ impl BuildEvaluation {
             .output()
             .map_err(EvaluationError::LaunchingNix)?;
 
+        if !data.stderr.is_empty() {
+            let stderr = String::from_utf8(data.stderr).unwrap();
+            eprintln!("{stderr}");
+        }
+
         let eval: Self = serde_json::from_slice(&data.stdout)?;
         Ok(eval)
     }
