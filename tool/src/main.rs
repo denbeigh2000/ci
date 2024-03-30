@@ -106,8 +106,12 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
         .map(|(k, v)| {
             let mut b = CommandStep::builder();
             let args = Vec::from([
-                // NOTE: assuming this exists?
-                "ci".to_string(),
+                // TODO: need to figure out how to best expose this so it's
+                // accessible for future jobs.
+                "nix".to_string(),
+                "run".to_string(),
+                ".#tool".to_string(),
+                "--".to_string(),
                 "execute".to_string(),
                 format!(".#{}", v.tag),
             ]);
@@ -128,14 +132,19 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
     // (likely releases, deployments, other automated actions)
     steps.extend(eval.steps);
 
-    // Add a collection step
-    let final_step = Step::Command(b.build(
-        "collect-results".to_string(),
-        Vec::from(["ci".to_string(), "collect".to_string()]),
-    ));
-
-    // append one more step to upload state at the end
-    steps.push(final_step);
+    // Add a collection step for after all the other steps are done
+    steps.extend([
+        Step::Wait(WaitStep::builder().build("wait-final".to_string())),
+        Step::Command(
+            b.build(
+                "collect-results".to_string(),
+                ["nix", "run", ".#tool", "--", "collect"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+            ),
+        ),
+    ]);
 
     Ok(BuildkitePipeline { steps })
 }
