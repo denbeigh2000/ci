@@ -11,7 +11,7 @@ fn default_timeout() -> u16 {
 #[derive(Deserialize, Serialize)]
 pub struct CommandStep {
     #[serde(default)]
-    allow_depdendency_failure: bool,
+    allow_dependency_failure: bool,
     command: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     concurrency_group: Option<String>,
@@ -34,7 +34,7 @@ impl CommandStep {
 
 #[derive(Default)]
 pub struct CommandStepBuilder {
-    allow_depdendency_failure: bool,
+    allow_dependency_failure: bool,
     concurrency_group: Option<String>,
     depends_on: Option<Vec<String>>,
     env: Option<HashMap<String, String>>,
@@ -44,7 +44,7 @@ pub struct CommandStepBuilder {
 
 impl CommandStepBuilder {
     pub fn set_allow_dependency_failure(&mut self, val: bool) -> &mut Self {
-        self.allow_depdendency_failure = val;
+        self.allow_dependency_failure = val;
         self
     }
 
@@ -81,7 +81,7 @@ impl CommandStepBuilder {
         CommandStep {
             key,
             command,
-            allow_depdendency_failure: self.allow_depdendency_failure,
+            allow_dependency_failure: self.allow_dependency_failure,
             concurrency_group: self.concurrency_group,
             depends_on: self.depends_on,
             env: self.env,
