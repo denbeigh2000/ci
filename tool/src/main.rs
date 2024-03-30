@@ -171,6 +171,9 @@ fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
             .map_err(EvaluateError::WritingToBKAgent)?;
     }
 
+    let data = String::from_utf8(json_data).unwrap();
+    eprintln!("{data}");
+
     let output = handle
         .wait_with_output()
         .map_err(EvaluateError::WaitingForBKAgent)?;
