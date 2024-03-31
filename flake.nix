@@ -21,10 +21,10 @@
   outputs = { self, nixpkgs, flake-utils, rust-overlay, naersk }:
     let
       systems = [ "aarch64-darwin" "x86_64-linux" ];
-      inherit (import ./nix) mkMkCIConfig;
+      inherit (import ./nix) mkCIConfig;
     in
     {
-      lib = { inherit mkMkCIConfig; };
+      lib = { inherit mkCIConfig; };
     } // (flake-utils.lib.eachSystem systems (system:
       let
         pkgs = import nixpkgs {
@@ -36,10 +36,6 @@
         naersk' = pkgs.callPackage naersk {
           cargo = rustToolchain;
           rustc = rustToolchain;
-        };
-        # TODO: improve ux
-        mkCIConfig = mkMkCIConfig {
-          inherit self pkgs;
         };
 
         buildInputs =
@@ -68,7 +64,10 @@
         };
 
         ci = mkCIConfig {
-          imports = [ ./example.nix ];
+          inherit self pkgs;
+          config = {
+            imports = [ ./example.nix ];
+          };
         };
       }));
 }
