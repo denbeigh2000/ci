@@ -43,7 +43,7 @@ let
 
   # First, filter out configurations we can't build
   nixosConfigs' = lib.filterAttrs (n: v: v.pkgs.system == system)
-    (if self ? nixosConfigurations then self.nixosConfigrations else { });
+    (if self ? nixosConfigurations then self.nixosConfigurations else { });
   nixosConfigs = lib.mapAttrs'
     (name: value: mapPackage {
       inherit name value;
