@@ -34,7 +34,7 @@ pub enum HTTPHandlingError {
 impl IntoResponse for HTTPHandlingError {
     fn into_response(self) -> axum::response::Response {
         let b = match self {
-            Self::StoreError(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR),
+            Self::StoreError(_e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR),
         };
 
         b.body(Body::empty()).unwrap()
