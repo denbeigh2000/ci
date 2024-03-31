@@ -4,7 +4,7 @@
   mkMkCIConfig = { self, pkgs, ... }:
     config:
     let
-      buildInfoPath = ./build-info.json;
+      buildInfoPath = "${self.sourcePath}/build-info.json";
       event =
         if
           (builtins.pathExists buildInfoPath)

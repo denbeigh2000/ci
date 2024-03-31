@@ -45,7 +45,7 @@ fn capture_buildkite_state(args: BuildkiteArgs) -> Result<(), CaptureError> {
     let path = args.path.clone();
 
     let state = CIRunState::from_args(args);
-    let state_file_path = path.join("./nix/build-info.json");
+    let state_file_path = path.join("./build-info.json");
     state.write_to_file(&state_file_path)?;
 
     create_state_commit(&path, &state_file_path)?;
