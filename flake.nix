@@ -65,7 +65,13 @@
         ci = mkCIConfig {
           inherit self pkgs;
           config = {
-            imports = [ ./example.nix ];
+            rustfmt = {
+              package = pkgs.rust-bin.stable.latest.rustfmt-preview;
+              checks = {
+                tool.src = ./tool/src;
+                server.src = ./server/src;
+              };
+            };
           };
         };
       }));

@@ -15,6 +15,7 @@
       modules = [
         ./buildkite.nix
         ./find-derivations.nix
+        ./lib/rustfmt.nix
         config
       ];
 
