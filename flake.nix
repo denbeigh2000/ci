@@ -59,7 +59,6 @@
         };
 
         packages = {
-          inherit (pkgs) hello;
           inherit (rustPkgs) tool server;
         };
 
