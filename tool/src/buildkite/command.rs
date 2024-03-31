@@ -32,14 +32,6 @@ impl CommandStep {
     }
 }
 
-fn format_command(cmd: Vec<String>) -> String {
-    let utf_vec: Vec<_> = cmd
-        .into_iter()
-        .map(|v| String::from_utf8(shell_quote::Bash::quote(&v)).unwrap())
-        .collect();
-    utf_vec.join(" ")
-}
-
 #[derive(Default)]
 pub struct CommandStepBuilder {
     allow_dependency_failure: bool,
@@ -88,7 +80,9 @@ impl CommandStepBuilder {
     pub fn build(self, key: String, command: Vec<String>) -> CommandStep {
         CommandStep {
             key,
-            command: format_command(command),
+            // NOTE: shell quoting here has previously interfered with bk's own
+            // env var substitution
+            command: command.join(" "),
             allow_dependency_failure: self.allow_dependency_failure,
             concurrency_group: self.concurrency_group,
             depends_on: self.depends_on,

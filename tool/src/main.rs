@@ -106,23 +106,15 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
         .map(|(k, v)| {
             let mut b = CommandStep::builder();
             let args = Vec::from([
-                // TODO: need to figure out how to best expose this so it's
-                // accessible for future jobs.
+                // TODO: should we also be wrapping this?
                 "nix".to_string(),
-                "run".to_string(),
-                ".#tool".to_string(),
-                "--".to_string(),
-                "execute".to_string(),
+                "build".to_string(),
                 format!(".#{}", v.tag),
             ]);
             b.set_label(format!("build {}", v.name));
-            Step::Command(b.build(k, args))
+            Step::Command(b.build(format!("build-{k}"), args))
         })
         .collect();
-
-    let mut b = CommandStep::builder();
-    b.set_label(":thinking: collecting results".to_string());
-    b.set_timeout_in_minutes(3);
 
     // add a wait step so all builds run first (necessary?)
     steps.push(Step::Wait(
@@ -132,19 +124,27 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
     // (likely releases, deployments, other automated actions)
     steps.extend(eval.steps);
 
+    let mut wait_step_b = WaitStep::builder();
+    wait_step_b
+        .set_allow_dependency_failure(true)
+        .set_continue_on_failure(true);
+    let wait_step = wait_step_b.build("wait-final".to_string());
+
     // Add a collection step for after all the other steps are done
-    steps.extend([
-        Step::Wait(WaitStep::builder().build("wait-final".to_string())),
-        Step::Command(
-            b.build(
-                "collect-results".to_string(),
-                ["nix", "run", ".#tool", "--", "collect"]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-            ),
-        ),
-    ]);
+    let mut cmd_step_b = CommandStep::builder();
+    cmd_step_b
+        .set_label(":shopping_trolley: collect results".to_string())
+        .set_timeout_in_minutes(3)
+        .set_allow_dependency_failure(true);
+    let cmd_step = cmd_step_b.build(
+        "collect-results".to_string(),
+        ["nix", "run", ".#tool", "--", "collect"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+
+    steps.extend([Step::Wait(wait_step), Step::Command(cmd_step)]);
 
     Ok(BuildkitePipeline { steps })
 }
