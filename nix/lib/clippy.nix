@@ -79,9 +79,13 @@ in
       };
 
       clippyCmd = pkgs.writeShellScriptBin "run-clippy.sh" ''
+        set -x
         set -euo pipefail
         cd "$1"
+        echo "$@"
         shift
+
+        echo "$@"
 
         ${config.clippy.package}/bin/clippy --deny warnings "$@"
       '';
