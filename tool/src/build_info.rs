@@ -44,15 +44,15 @@ pub struct FoundDerivationBuild {
 
 impl FoundDerivationBuild {
     pub fn label(&self) -> String {
-        let (name, emoji) = match self.build_type {
-            BuildTargetType::Package => ("Package", "package"),
-            BuildTargetType::NixDarwinConfiguration => ("Nix Darwin config", "mac"),
-            BuildTargetType::HomeManagerConfiguration => ("Home Mgr config", "house_with_garden"),
-            BuildTargetType::NixOSConfiguration => ("NixOS config", "nix"),
-            BuildTargetType::DevShell => ("DevShell", "terminal"),
+        let emoji = match self.build_type {
+            BuildTargetType::Package => "package",
+            BuildTargetType::NixDarwinConfiguration => "mac",
+            BuildTargetType::HomeManagerConfiguration => "house_with_garden",
+            BuildTargetType::NixOSConfiguration => "nix",
+            BuildTargetType::DevShell => "terminal",
         };
 
-        format!(":hammer_and_wrench: :{emoji}: build {name} {}", self.name)
+        format!(":hammer_and_wrench: :{emoji}: {}", self.name)
     }
 }
 
