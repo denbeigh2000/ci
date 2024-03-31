@@ -3,30 +3,17 @@ let
   inherit (pkgs) lib system;
   nullOr = first: second: if first != null then first else second;
 
-  derivName = key: deriv: buildType: (
-    ({
-      "package" = if deriv ? pname then deriv.pname else deriv.name;
-      "devshell" = key;
-      "home" = key;
-      "nixos" = deriv.config.networking.hostName;
-      "darwin" = deriv.config.networking.hostName;
-    }).${buildType}
-  );
-
-  fmtDeriv = { deriv, name, tag, buildType }: {
+  fmtDeriv = { deriv, displayName, tag, buildType }: {
     inherit tag;
     build_type = buildType;
-    name = derivName name deriv buildType;
+    name = displayName;
     path = deriv.outPath;
   };
 
-  mapSet = typeName:
-    (name: value: lib.nameValuePair "${typeName}-${name}" (fmtDeriv value));
-
-  mapPackage = { name, value, tag, typeName }:
+  mapPackage = { displayName, name, value, tag, typeName }:
     let
       key = "${typeName}-${name}";
-      data = fmtDeriv { inherit name tag; deriv = value; buildType = typeName; };
+      data = fmtDeriv { inherit displayName tag; deriv = value; buildType = typeName; };
     in
     lib.nameValuePair key data;
 
@@ -39,6 +26,7 @@ let
   packages = lib.mapAttrs'
     (name: value: mapPackage {
       inherit name value;
+      displayName = name;
       tag = "packages.${system}.${name}";
       typeName = "package";
     })
@@ -50,8 +38,9 @@ let
     (if self ? nixosConfigurations then self.nixosConfigurations else { });
   nixosConfigs = lib.mapAttrs'
     (name: value: mapPackage {
-      inherit value;
-      name = value.config.networking.hostName;
+      inherit name;
+      value = value.config.system.build.toplevel;
+      displayName = value.config.networking.hostName;
       tag = "nixosConfigurations.${name}.system.build.toplevel";
       typeName = "nixos";
     })
@@ -59,7 +48,9 @@ let
 
   darwinConfigs = lib.mapAttrs'
     (name: value: mapPackage {
-      inherit name value;
+      inherit name;
+      displayName = value.config.networking.hostName;
+      value = value.system;
       tag = "darwinConfigurations.${name}.system";
       typeName = "darwin";
     })
@@ -68,6 +59,7 @@ let
   devShellConfigs = lib.mapAttrs'
     (name: value: mapPackage {
       inherit name value;
+      displayName = name;
       tag = "devShells.${system}.${name}";
       typeName = "devshell";
     })
