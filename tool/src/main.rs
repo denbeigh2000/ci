@@ -125,7 +125,9 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
     steps.extend(eval.steps);
 
     let mut wait_step_b = WaitStep::builder();
-    wait_step_b.set_allow_dependency_failure(true);
+    wait_step_b
+        .set_allow_dependency_failure(true)
+        .set_continue_on_failure(true);
     let wait_step = wait_step_b.build("wait-final".to_string());
 
     // Add a collection step for after all the other steps are done
