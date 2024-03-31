@@ -32,10 +32,10 @@
           overlays = [ rust-overlay.overlays.default ];
         };
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default;
+        rustToolchainPkgs = pkgs.rust-bin.stable.latest;
         naersk' = pkgs.callPackage naersk {
-          cargo = rustToolchain;
-          rustc = rustToolchain;
+          cargo = rustToolchainPkgs.default;
+          rustc = rustToolchainPkgs.default;
         };
 
         buildInputs =
@@ -55,24 +55,33 @@
       {
         devShells.default = pkgs.mkShell {
           inherit buildInputs;
-          packages = [ rustToolchain ];
+          packages = [ rustToolchainPkgs.default ];
         };
 
         packages = {
           inherit (rustPkgs) tool server;
         };
 
-        ci = mkCIConfig {
-          inherit self pkgs;
-          config = {
-            rustfmt = {
-              package = pkgs.rust-bin.stable.latest.rustfmt-preview;
-              checks = {
-                tool.src = ./tool/src;
-                server.src = ./server/src;
+        ci = mkCIConfig
+          {
+            inherit self pkgs;
+            config = {
+              rustfmt = {
+                package = rustToolchainPkgs.rustfmt-preview;
+                checks = {
+                  tool.src = ./tool/src;
+                  server.src = ./server/src;
+                };
+              };
+
+              clippy = {
+                package = rustToolchainPkgs.clippy-preview;
+                checks = {
+                  tool.src = ./tool/src;
+                  server.src = ./server/src;
+                };
               };
             };
           };
-        };
       }));
 }
