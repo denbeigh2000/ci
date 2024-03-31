@@ -41,10 +41,13 @@ let
       inherit name;
       value = value.config.system.build.toplevel;
       displayName = value.config.networking.hostName;
-      tag = "nixosConfigurations.${name}.system.build.toplevel";
+      tag = "nixosConfigurations.${name}.config.system.build.toplevel";
       typeName = "nixos";
     })
     nixosConfigs';
+
+  darwinConfigs' = lib.filterAttrs (n: v: v.system.system == system)
+    (if self ? darwinConfigurations then self.darwinConfigurations else { });
 
   darwinConfigs = lib.mapAttrs'
     (name: value: mapPackage {
@@ -54,7 +57,7 @@ let
       tag = "darwinConfigurations.${name}.system";
       typeName = "darwin";
     })
-    (if self ? darwinConfigurations then self.darwinConfigurations else { });
+    darwinConfigs';
 
   devShellConfigs = lib.mapAttrs'
     (name: value: mapPackage {
