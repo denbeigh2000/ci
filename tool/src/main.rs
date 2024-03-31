@@ -199,14 +199,15 @@ enum ExecuteError {
 }
 
 fn nix_action(
-    action: &'static str,
+    action: &[&'static str],
     args: BuildkiteArgs,
     target: String,
 ) -> Result<i32, ExecuteError> {
     apply(&args)?;
     let target_str = format!(".#{target}");
     let res = Command::new("nix")
-        .args([action, &target_str])
+        .args(action)
+        .arg(&target_str)
         .spawn()
         .map_err(ExecuteError::SpawiningProcess)?
         .wait()
@@ -239,8 +240,8 @@ fn real_main() -> Result<i32, MainError> {
     let (cmd, action, bk) = args.into_parts();
     let code = match action {
         Action::Evaluate => evaluate(cmd, bk)?,
-        Action::Execute { target } => nix_action("run", bk, target)?,
-        Action::Build { target } => nix_action("build", bk, target)?,
+        Action::Execute { target } => nix_action(&["run"], bk, target)?,
+        Action::Build { target } => nix_action(&["build", "--no-out-link"], bk, target)?,
         // TODO: need to have this collect information about the CI job after
         // all steps have finished
         Action::Collect => collect_final_pipeline_state(bk)?,
