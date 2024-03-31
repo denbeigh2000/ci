@@ -108,7 +108,7 @@ fn make_buildkite_pipeline(
         .into_iter()
         .map(|(k, v)| {
             let mut b = CommandStep::builder();
-            let args = format!("nix build .#{}", v.tag);
+            let args = format!("$CI_COMMAND build {}", v.tag);
             b.set_label(v.label());
             Step::Command(b.build(format!("build-{k}"), args))
         })
@@ -241,7 +241,7 @@ fn real_main() -> Result<i32, MainError> {
     let code = match action {
         Action::Evaluate => evaluate(cmd, bk)?,
         Action::Execute { target } => nix_action(&["run"], bk, target)?,
-        Action::Build { target } => nix_action(&["build", "--no-out-link"], bk, target)?,
+        Action::Build { target } => nix_action(&["build", "--no-link"], bk, target)?,
         // TODO: need to have this collect information about the CI job after
         // all steps have finished
         Action::Collect => collect_final_pipeline_state(bk)?,
