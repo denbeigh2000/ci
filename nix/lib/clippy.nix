@@ -92,9 +92,8 @@ in
 
       buildClippyCmdScript = { package, subdir, src }:
         pkgs.writeShellScriptBin "run-clippy.sh" ''
-          cd ${src}
+          cd "''${BUILDKITE_REPO_LOCATION:-}"
           ${lib.optionalString (subdir != null) "cd ${subdir}"}
-          CARGO_TARGET_DIR=/tmp/cargo-clippy \
             ${package}/bin/cargo-clippy --deny=warnings "$@"
         '';
 
