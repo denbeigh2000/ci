@@ -1,20 +1,24 @@
 { self, pkgs, config, ... }:
-
 let
   inherit (pkgs) lib system;
   nullOr = first: second: if first != null then first else second;
 
-  fmtDeriv = { deriv, name, tag, buildType }:
-    let
-      derivName = if deriv ? pname then deriv.pname else deriv.name;
-      name' = if derivName == "nix-shell" then name else derivName;
-    in
-    {
-      inherit tag;
-      build_type = buildType;
-      name = name';
-      path = deriv.outPath;
-    };
+  derivName = key: deriv: buildType: (
+    ({
+      "package" = if deriv ? pname then deriv.pname else deriv.name;
+      "devshell" = key;
+      "home" = key;
+      "nixos" = deriv.config.networking.hostName;
+      "darwin" = deriv.config.networking.hostName;
+    }).${buildType}
+  );
+
+  fmtDeriv = { deriv, name, tag, buildType }: {
+    inherit tag;
+    build_type = buildType;
+    name = derivName name deriv buildType;
+    path = deriv.outPath;
+  };
 
   mapSet = typeName:
     (name: value: lib.nameValuePair "${typeName}-${name}" (fmtDeriv value));
@@ -46,8 +50,9 @@ let
     (if self ? nixosConfigurations then self.nixosConfigurations else { });
   nixosConfigs = lib.mapAttrs'
     (name: value: mapPackage {
-      inherit name value;
-      tag = "nixosConfigurations.${name}";
+      inherit value;
+      name = value.config.networking.hostName;
+      tag = "nixosConfigurations.${name}.system.build.toplevel";
       typeName = "nixos";
     })
     nixosConfigs';
