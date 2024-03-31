@@ -4,13 +4,14 @@ let
   inherit (pkgs) lib system;
   nullOr = first: second: if first != null then first else second;
 
-  fmtDeriv = { deriv, name, tag }:
+  fmtDeriv = { deriv, name, tag, buildType }:
     let
       derivName = if deriv ? pname then deriv.pname else deriv.name;
       name' = if derivName == "nix-shell" then name else derivName;
     in
     {
       inherit tag;
+      build_type = buildType;
       name = name';
       path = deriv.outPath;
     };
@@ -21,7 +22,7 @@ let
   mapPackage = { name, value, tag, typeName }:
     let
       key = "${typeName}-${name}";
-      data = fmtDeriv { inherit name tag; deriv = value; };
+      data = fmtDeriv { inherit name tag; deriv = value; buildType = typeName; };
     in
     lib.nameValuePair key data;
 

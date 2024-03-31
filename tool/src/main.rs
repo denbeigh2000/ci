@@ -109,7 +109,7 @@ fn make_buildkite_pipeline(
         .map(|(k, v)| {
             let mut b = CommandStep::builder();
             let args = format!("nix build .#{}", v.tag);
-            b.set_label(format!(":hammer_and_wrench: build {}", v.name));
+            b.set_label(v.label());
             Step::Command(b.build(format!("build-{k}"), args))
         })
         .collect();

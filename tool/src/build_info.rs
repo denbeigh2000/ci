@@ -21,10 +21,39 @@ const SYSTEM: &str = "x86_64-darwin";
 const SYSTEM: &str = "x86_64-linux";
 
 #[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BuildTargetType {
+    Package,
+    DevShell,
+    #[serde(rename = "nixos")]
+    NixOSConfiguration,
+    #[serde(rename = "darwin")]
+    NixDarwinConfiguration,
+    // maybe one day?
+    #[serde(rename = "home")]
+    HomeManagerConfiguration,
+}
+
+#[derive(Deserialize)]
 pub struct FoundDerivationBuild {
     pub name: String,
+    pub build_type: BuildTargetType,
     pub path: PathBuf,
     pub tag: String,
+}
+
+impl FoundDerivationBuild {
+    pub fn label(&self) -> String {
+        let (name, emoji) = match self.build_type {
+            BuildTargetType::Package => ("Package", "package"),
+            BuildTargetType::NixDarwinConfiguration => ("Nix Darwin config", "mac"),
+            BuildTargetType::HomeManagerConfiguration => ("Home Mgr config", "house_with_garden"),
+            BuildTargetType::NixOSConfiguration => ("NixOS config", "nix"),
+            BuildTargetType::DevShell => ("DevShell", "terminal"),
+        };
+
+        format!(":hammer_and_wrench: :{emoji}: build {name} {}", self.name)
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -61,6 +90,8 @@ impl BuildEvaluation {
             eprintln!("{stderr}");
         }
 
+        // TODO: will we need to dedupe in the future for (e.g.) default
+        // targets?
         let eval: Self = serde_json::from_slice(&data.stdout)?;
         Ok(eval)
     }
