@@ -78,26 +78,15 @@ in
         };
       };
 
-      clippyCmd = pkgs.writeShellScriptBin "run-clippy.sh" ''
-        set -x
-        set -euo pipefail
-        cd "$1"
-        echo "$@"
-        shift
-
-        echo "$@"
-
-        ${config.clippy.package}/bin/clippy --deny warnings "$@"
-      '';
-
+      inherit (config.clippy) package checks;
       buildClippyCmd = key: cfg: {
         name = name' key;
-        value = "${clippyCmd} ${cfg.src}";
+        value = ''cd ${cfg.src} && ${package}/bin/cargo-clippy --deny=warnings "$@"'';
       };
 
     in
     {
-      steps = lib.mapAttrs' buildClippyStep config.clippy.checks;
-      commands = lib.mapAttrs' buildClippyCmd config.clippy.checks;
+      steps = lib.mapAttrs' buildClippyStep checks;
+      commands = lib.mapAttrs' buildClippyCmd checks;
     };
 }
