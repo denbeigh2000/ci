@@ -1,5 +1,5 @@
 {
-  mkCIConfig = { self, pkgs, config, ... }:
+  mkCIConfig = { self, pkgs, config ? { }, ... }:
     let
       buildInfoPath = "${self.sourcePath}/build-info.json";
       event =
