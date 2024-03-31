@@ -33,12 +33,16 @@ pub struct CliArgs {
     #[arg(long, env = "BUILDKITE_TAG")]
     pub tag: Option<String>,
 
+    #[arg(long, env = "CI_COMMAND", default_value = "ci")]
+    pub ci_cmd: String,
+
     #[command(subcommand)]
     pub action: Action,
 }
 impl CliArgs {
-    pub fn into_parts(self) -> (Action, BuildkiteArgs) {
+    pub fn into_parts(self) -> (String, Action, BuildkiteArgs) {
         (
+            self.ci_cmd,
             self.action,
             BuildkiteArgs {
                 commit: self.commit,
@@ -61,4 +65,6 @@ pub enum Action {
     Evaluate,
     /// Execute a build target
     Execute { target: String },
+    /// Build a derivation
+    Build { target: String },
 }

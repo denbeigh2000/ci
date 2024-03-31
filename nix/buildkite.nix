@@ -40,7 +40,7 @@ in
     commandBuilder = lib.mkOption {
       type = types.functionTo types.str;
       # TODO: How do we best expose the tool for easy consumption?
-      default = (stepKey: "nix run .#tool -- execute ci.${system}.config.commandTargets.${stepKey}");
+      default = (stepKey: "@tool@ execute ci.${system}.config.commandTargets.${stepKey}");
     };
 
     steps = lib.mkOption {

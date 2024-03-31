@@ -12,18 +12,18 @@ fn default_timeout() -> u16 {
 pub struct CommandStep {
     #[serde(default)]
     allow_dependency_failure: bool,
-    command: String,
+    pub command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    concurrency_group: Option<String>,
+    pub concurrency_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    depends_on: Option<Vec<String>>,
+    pub depends_on: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, String>>,
-    key: String,
+    pub env: Option<HashMap<String, String>>,
+    pub key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    label: Option<String>,
+    pub label: Option<String>,
     #[serde(default = "default_timeout")]
-    timeout_in_minutes: u16,
+    pub timeout_in_minutes: u16,
 }
 
 impl CommandStep {
@@ -77,12 +77,10 @@ impl CommandStepBuilder {
         self
     }
 
-    pub fn build(self, key: String, command: Vec<String>) -> CommandStep {
+    pub fn build(self, key: String, command: String) -> CommandStep {
         CommandStep {
             key,
-            // NOTE: shell quoting here has previously interfered with bk's own
-            // env var substitution
-            command: command.join(" "),
+            command,
             allow_dependency_failure: self.allow_dependency_failure,
             concurrency_group: self.concurrency_group,
             depends_on: self.depends_on,

@@ -94,9 +94,12 @@ enum EvaluateError {
 }
 
 // TODO: should this have its' own error type?
-fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, DerivePipelineError> {
+fn make_buildkite_pipeline(
+    cmd: String,
+    args: BuildkiteArgs,
+) -> Result<BuildkitePipeline, DerivePipelineError> {
     capture_buildkite_state(args.clone())?;
-    let eval = BuildEvaluation::from_env(&args.path)?;
+    let mut eval = BuildEvaluation::from_env(&args.path)?;
 
     // start with all the steps building our derivations
     // TODO: check which derivations have been built already
@@ -105,24 +108,28 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
         .into_iter()
         .map(|(k, v)| {
             let mut b = CommandStep::builder();
-            let args = Vec::from([
-                // TODO: should we also be wrapping this?
-                "nix".to_string(),
-                "build".to_string(),
-                format!(".#{}", v.tag),
-            ]);
+            let args = format!("nix build .#{}", v.tag);
             b.set_label(format!(":hammer_and_wrench: build {}", v.name));
             Step::Command(b.build(format!("build-{k}"), args))
         })
         .collect();
 
-    // add a wait step so all builds run first (necessary?)
-    steps.push(Step::Wait(
-        WaitStep::builder().build("wait-builds".to_string()),
-    ));
-    // add the additional requested ones from our evaluated config
-    // (likely releases, deployments, other automated actions)
-    steps.extend(eval.steps);
+    if !eval.steps.is_empty() {
+        // add a wait step so all builds run first (necessary?)
+        steps.push(Step::Wait(
+            WaitStep::builder().build("wait-builds".to_string()),
+        ));
+
+        eval.steps.iter_mut().for_each(|mut step| {
+            if let Step::Command(ref mut s) = &mut step {
+                s.command = s.command.replace("@tool@", &cmd);
+            }
+        });
+
+        // add the additional requested ones from our evaluated config
+        // (likely releases, deployments, other automated actions)
+        steps.extend(eval.steps);
+    }
 
     let mut wait_step_b = WaitStep::builder();
     wait_step_b
@@ -138,10 +145,7 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
         .set_allow_dependency_failure(true);
     let cmd_step = cmd_step_b.build(
         "collect-results".to_string(),
-        ["nix", "run", ".#tool", "--", "collect"]
-            .into_iter()
-            .map(String::from)
-            .collect(),
+        [cmd, "collect".to_string()].join(" "),
     );
 
     steps.extend([Step::Wait(wait_step), Step::Command(cmd_step)]);
@@ -149,8 +153,8 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
     Ok(BuildkitePipeline { steps })
 }
 
-fn evaluate(args: BuildkiteArgs) -> Result<i32, EvaluateError> {
-    let pipeline = make_buildkite_pipeline(args)?;
+fn evaluate(cmd_name: String, args: BuildkiteArgs) -> Result<i32, EvaluateError> {
+    let pipeline = make_buildkite_pipeline(cmd_name, args)?;
     let json_data = serde_json::to_vec(&pipeline)?;
 
     let mut cmd = std::process::Command::new("buildkite-agent");
@@ -194,20 +198,20 @@ enum ExecuteError {
     AwaitingProcess(std::io::Error),
 }
 
-fn execute(args: BuildkiteArgs, target: String) -> Result<i32, ExecuteError> {
+fn nix_action(
+    action: &'static str,
+    args: BuildkiteArgs,
+    target: String,
+) -> Result<i32, ExecuteError> {
     apply(&args)?;
-    // We need to do the execution through here, after applying the commit with
-    // our trigger info in it, so that we evaluate the versions of the scripts
-    // with information potentially embedded (tags, etc).
     let target_str = format!(".#{target}");
     let res = Command::new("nix")
-        .args(["run", &target_str])
+        .args([action, &target_str])
         .spawn()
         .map_err(ExecuteError::SpawiningProcess)?
         .wait()
         .map_err(ExecuteError::AwaitingProcess)?;
 
-    // NOTE: I think missing a code here means something is not ok?
     Ok(res.code().unwrap_or(1))
 }
 
@@ -232,10 +236,11 @@ enum MainError {
 
 fn real_main() -> Result<i32, MainError> {
     let args = CliArgs::parse();
-    let (action, bk) = args.into_parts();
+    let (cmd, action, bk) = args.into_parts();
     let code = match action {
-        Action::Evaluate => evaluate(bk)?,
-        Action::Execute { target } => execute(bk, target)?,
+        Action::Evaluate => evaluate(cmd, bk)?,
+        Action::Execute { target } => nix_action("run", bk, target)?,
+        Action::Build { target } => nix_action("build", bk, target)?,
         // TODO: need to have this collect information about the CI job after
         // all steps have finished
         Action::Collect => collect_final_pipeline_state(bk)?,
