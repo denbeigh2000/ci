@@ -112,7 +112,7 @@ fn make_buildkite_pipeline(args: BuildkiteArgs) -> Result<BuildkitePipeline, Der
                 format!(".#{}", v.tag),
             ]);
             b.set_label(format!(":hammer_and_wrench: build {}", v.name));
-            Step::Command(b.build(k, args))
+            Step::Command(b.build(format!("build-{k}"), args))
         })
         .collect();
 
