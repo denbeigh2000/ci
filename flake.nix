@@ -24,7 +24,7 @@
       inherit (import ./nix) mkMkCIConfig;
     in
     {
-      lib = { };
+      lib = { inherit mkMkCIConfig; };
     } // (flake-utils.lib.eachSystem systems (system:
       let
         pkgs = import nixpkgs {
