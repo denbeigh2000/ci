@@ -37,7 +37,16 @@ in
           src = lib.mkOption {
             type = types.path;
             description = ''
-              Directory to run the checks from.
+              Directory with Cargo.lock
+            '';
+          };
+
+          subdir = lib.mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              If specifed, will cd to this directory relative to `src` before
+              executing `clippy`.
             '';
           };
 
@@ -78,10 +87,28 @@ in
         };
       };
 
-      inherit (config.clippy) package checks;
+      join = mid: elems:
+        (lib.strings.concatStrings (lib.strings.intersperse " && " elems));
+
+      buildClippyCmdScript = { package, subdir, src }:
+        pkgs.writeShellScriptBin "run-clippy.sh" ''
+          cd ${src}
+          ${lib.optionalString (subdir != null) "cd ${subdir}"}
+          CARGO_TARGET_DIR=/tmp/cargo-clippy \
+            ${package}/bin/cargo-clippy --deny=warnings "$@"
+        '';
+
+
+      inherit
+        (config.clippy)
+        package
+        checks;
       buildClippyCmd = key: cfg: {
         name = name' key;
-        value = ''cd ${cfg.src} && ${package}/bin/cargo-clippy --deny=warnings "$@"'';
+        value = "${buildClippyCmdScript {
+          inherit (config.clippy) package;
+          inherit (cfg) subdir src;
+        }}/bin/run-clippy.sh";
       };
 
     in

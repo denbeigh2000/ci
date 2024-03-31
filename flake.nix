@@ -75,10 +75,18 @@
               };
 
               clippy = {
-                package = rustToolchainPkgs.clippy-preview;
+                # NOTE: if we don't actually use default here, clippy fails
+                # because it can't reference rust-std etc.
+                package = rustToolchainPkgs.default;
                 checks = {
-                  tool.src = ./tool/src;
-                  server.src = ./server/src;
+                  tool = {
+                    src = ./.;
+                    subdir = "tool";
+                  };
+                  server = {
+                    src = ./.;
+                    subdir = "server";
+                  };
                 };
               };
             };
