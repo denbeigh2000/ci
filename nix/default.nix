@@ -16,6 +16,7 @@
         ./buildkite.nix
         ./find-derivations.nix
         ./lib/rustfmt.nix
+        ./lib/nixpkgs-fmt.nix
         config
       ];
 
