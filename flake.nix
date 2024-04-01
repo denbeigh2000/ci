@@ -72,6 +72,14 @@
                 server.src = ./server/src;
               };
             };
+
+            nixpkgs-fmt = {
+              checks = {
+                nix = {
+                  srcs = [ ./. ];
+                };
+              };
+            };
           };
         };
       }));
