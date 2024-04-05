@@ -3,7 +3,6 @@ use std::process::Command;
 use build_info::{CIRunStateWriteToFileError, EvaluationError};
 use buildkite::{RunError, WaitStep};
 use clap::Parser;
-#[cfg(debug_assertions)]
 use flags::{Action, BuildkiteArgs};
 use git::{
     apply_patch, fetch_patch, ApplyPatchError, CreateCommitError, FetchPatchError,

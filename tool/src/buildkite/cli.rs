@@ -1,8 +1,9 @@
-use std::{
-    io::Write,
-    os::unix::process::ExitStatusExt,
-    process::{Command, ExitStatus, Output, Stdio},
-};
+use std::io::Write;
+#[cfg(debug_assertions)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(debug_assertions)]
+use std::process::ExitStatus;
+use std::process::{Command, Output, Stdio};
 
 #[cfg(debug_assertions)]
 use crate::develop::{print_cmd, IS_DEVELOP_MODE};
