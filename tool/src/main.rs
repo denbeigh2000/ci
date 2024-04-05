@@ -1,11 +1,9 @@
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use build_info::{CIRunStateWriteToFileError, EvaluationError};
-use buildkite::WaitStep;
+use buildkite::{RunError, WaitStep};
 use clap::Parser;
 #[cfg(debug_assertions)]
-use develop::{print_cmd, IS_DEVELOP_MODE};
 use flags::{Action, BuildkiteArgs};
 use git::{
     apply_patch, fetch_patch, ApplyPatchError, CreateCommitError, FetchPatchError,
@@ -15,7 +13,7 @@ use serde::Serialize;
 use simple_logger::SimpleLogger;
 
 use crate::build_info::{BuildEvaluation, CIRunState};
-use crate::buildkite::{CommandStep, Step};
+use crate::buildkite::{Cli, CommandStep, Step};
 use crate::flags::CliArgs;
 use crate::git::{create_state_commit, upload_patch};
 
@@ -64,7 +62,9 @@ enum ApplyError {
 }
 
 fn apply(args: &BuildkiteArgs) -> Result<(), ApplyError> {
+    log::info!("fetching patch");
     fetch_patch()?;
+    log::info!("applying patch {}", args.path.to_string_lossy());
     apply_patch(&args.path)?;
 
     Ok(())
@@ -84,14 +84,8 @@ enum EvaluateError {
     Deriving(#[from] DerivePipelineError),
     #[error("error encoding pipeline to JSON: {0}")]
     Encoding(#[from] serde_json::Error),
-    #[error("error starting `buildkite-agent`: {0}")]
-    InvokingBKAgent(std::io::Error),
-    #[error("error writing JSON data to `buildkite-agent`: {0}")]
-    WritingToBKAgent(std::io::Error),
-    #[error("error waiting for `buildkite-agent` to finish: {0}")]
-    WaitingForBKAgent(std::io::Error),
-    #[error("`buildkite-agent` exited unsuccessfully (status {0:?}):\n{1}")]
-    BKAgentExitState(Option<i32>, String),
+    #[error("error running buildkite-agent: {0}")]
+    UploadingPipeline(#[from] RunError),
 }
 
 // TODO: should this have its' own error type?
@@ -155,36 +149,13 @@ fn make_buildkite_pipeline(
 }
 
 fn evaluate(cmd_name: String, args: BuildkiteArgs) -> Result<i32, EvaluateError> {
+    log::info!("Evaluating pipeline");
     let pipeline = make_buildkite_pipeline(cmd_name, args)?;
+    log::trace!("Encoding to JSON");
     let json_data = serde_json::to_vec(&pipeline)?;
 
-    let mut cmd = std::process::Command::new("buildkite-agent");
-    cmd.args(["pipeline", "upload"]);
-    #[cfg(debug_assertions)]
-    if *IS_DEVELOP_MODE {
-        print_cmd("buildkite-agent", &cmd);
-        let data = String::from_utf8(json_data).unwrap();
-        println!("data: {data}");
-        return Ok(0);
-    }
-    cmd.stdin(Stdio::piped());
-    let mut handle = cmd.spawn().map_err(EvaluateError::InvokingBKAgent)?;
-    {
-        let mut stdin = handle.stdin.take().unwrap();
-        stdin
-            .write_all(&json_data)
-            .map_err(EvaluateError::WritingToBKAgent)?;
-    }
-
-    let output = handle
-        .wait_with_output()
-        .map_err(EvaluateError::WaitingForBKAgent)?;
-    if !output.status.success() {
-        return Err(EvaluateError::BKAgentExitState(
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr).to_string(),
-        ));
-    }
+    log::info!("Uploading buildkite pipeline");
+    Cli.pipeline_upload_bytes(&json_data)?;
 
     Ok(0)
 }
@@ -204,8 +175,11 @@ fn nix_action(
     args: BuildkiteArgs,
     target: String,
 ) -> Result<i32, ExecuteError> {
+    let msg = action.join(" ");
+    log::info!("preparing `nix {msg}`");
     apply(&args)?;
     let target_str = format!(".#{target}");
+    log::info!("running `nix {msg} {target_str}`");
     let res = Command::new("nix")
         .args(action)
         .arg(&target_str)

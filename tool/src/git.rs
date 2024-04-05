@@ -1,6 +1,7 @@
 use std::process::Command;
 use std::{io::Write, path::Path};
 
+use crate::buildkite::{Cli, RunError};
 #[cfg(debug_assertions)]
 use crate::develop::{print_cmd, IS_DEVELOP_MODE};
 
@@ -12,9 +13,7 @@ const GIT_EMAIL: &str = "ci@denbeigh.cloud";
 #[derive(thiserror::Error, Debug)]
 pub enum UploadingPatchError {
     #[error("failed to invoke `buildkite-agent`: {0}")]
-    InvokingBKAgent(#[from] std::io::Error),
-    #[error("error status {0:?} from `buildkite-agent`: {1}")]
-    BKAgentStatus(Option<i32>, String),
+    RunningBKAgent(#[from] RunError),
     #[error("failed to invoke `git`: {0}")]
     InvokingGit(std::io::Error),
     #[error("error status {0:?} from `git`: {1}")]
@@ -38,26 +37,15 @@ fn format_patch(repo: &Path) -> Result<Vec<u8>, UploadingPatchError> {
 pub fn upload_patch(repo: &Path) -> Result<(), UploadingPatchError> {
     let patch_data = format_patch(repo)?;
     {
-        let mut f = std::fs::File::create(repo.join(PATCH_FILENAME)).expect("creating file");
+        let path = repo.join(PATCH_FILENAME);
+        log::debug!("creating patch file {}", path.to_string_lossy());
+        let mut f = std::fs::File::create(path).expect("creating file");
+        log::debug!("writing {} bytes of patch data", patch_data.len());
         f.write_all(&patch_data).expect("writing data");
     }
 
-    let mut cmd = std::process::Command::new("buildkite-agent");
-    cmd.args(["artifact", "upload", PATCH_FILENAME]);
-    #[cfg(debug_assertions)]
-    if *IS_DEVELOP_MODE {
-        print_cmd("buildkite-agent", &cmd);
-        return Ok(());
-    }
-
-    let upload_result = cmd.output()?;
-    if !upload_result.status.success() {
-        let out = String::from_utf8_lossy(&upload_result.stderr).to_string();
-        return Err(UploadingPatchError::BKAgentStatus(
-            upload_result.status.code(),
-            out,
-        ));
-    }
+    log::info!("Uploading patch file");
+    Cli.upload(&[PATCH_FILENAME])?;
 
     Ok(())
 }
@@ -134,30 +122,13 @@ pub fn create_state_commit(repo: &Path, state_file: &Path) -> Result<(), CreateC
 
 #[derive(thiserror::Error, Debug)]
 pub enum FetchPatchError {
-    #[error("error invoking BK Agent: {0}")]
-    InvokingBKAgent(std::io::Error),
-    #[error("error status {0:?}, from BK Agent while downloading/writing: {1}")]
-    Transferring(Option<i32>, String),
+    #[error("error downloading patch: {0}")]
+    RunningBKAgent(#[from] RunError),
 }
 
 pub fn fetch_patch() -> Result<(), FetchPatchError> {
-    let mut cmd = Command::new("buildkite-agent");
-    cmd.args(["artifact", "download", PATCH_FILENAME, "."]);
-
-    #[cfg(debug_assertions)]
-    if *IS_DEVELOP_MODE {
-        print_cmd("buildkite-agent", &cmd);
-        return Ok(());
-    }
-
-    let output = cmd.output().map_err(FetchPatchError::InvokingBKAgent)?;
-
-    let status = output.status;
-    if !status.success() {
-        let st = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(FetchPatchError::Transferring(status.code(), st));
-    }
-
+    log::info!("fetching patch");
+    Cli.download(PATCH_FILENAME, ".")?;
     Ok(())
 }
 
@@ -170,6 +141,7 @@ pub enum ApplyPatchError {
 }
 
 pub fn apply_patch(repo_path: &Path) -> Result<(), ApplyPatchError> {
+    log::info!("applying patch");
     let mut cmd = Command::new("git");
     cmd.current_dir(repo_path)
         .args(["am", PATCH_FILENAME, "--committer-date-is-author-date"])
