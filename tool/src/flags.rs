@@ -3,6 +3,16 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::LevelFilter;
 
+lazy_static::lazy_static! {
+    static ref DEFAULT_LOG_LEVEL: LevelFilter = {
+        let ci_str = std::env::var("CI");
+        match ci_str.as_ref().map(|m| m.as_str()) {
+            Err(_) | Ok("0") | Ok("false") | Ok("no") | Ok("n") => LevelFilter::Warn,
+            Ok(_) => LevelFilter::Info,
+        }
+    };
+}
+
 #[derive(Clone)]
 pub struct BuildkiteArgs {
     pub commit: String,
@@ -37,7 +47,7 @@ pub struct CliArgs {
     #[arg(long, env = "CI_COMMAND", default_value = "ci")]
     pub ci_cmd: String,
 
-    #[arg(long, env = "LOG_LEVEL")]
+    #[arg(long, env = "LOG_LEVEL", default_value_t = *DEFAULT_LOG_LEVEL)]
     pub log_level: LevelFilter,
 
     #[command(subcommand)]
