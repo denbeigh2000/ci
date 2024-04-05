@@ -12,6 +12,7 @@ use git::{
     UploadingPatchError,
 };
 use serde::Serialize;
+use simple_logger::SimpleLogger;
 
 use crate::build_info::{BuildEvaluation, CIRunState};
 use crate::buildkite::{CommandStep, Step};
@@ -237,7 +238,12 @@ enum MainError {
 
 fn real_main() -> Result<i32, MainError> {
     let args = CliArgs::parse();
-    let (cmd, action, bk) = args.into_parts();
+
+    let (cmd, log_level, action, bk) = args.into_parts();
+    SimpleLogger::new()
+        .with_level(log_level)
+        .init()
+        .expect("failed to set logging");
     let code = match action {
         Action::Evaluate => evaluate(cmd, bk)?,
         Action::Execute { target } => nix_action(&["run"], bk, target)?,

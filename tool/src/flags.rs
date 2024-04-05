@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use log::LevelFilter;
 
 #[derive(Clone)]
 pub struct BuildkiteArgs {
@@ -36,13 +37,17 @@ pub struct CliArgs {
     #[arg(long, env = "CI_COMMAND", default_value = "ci")]
     pub ci_cmd: String,
 
+    #[arg(long, env = "LOG_LEVEL")]
+    pub log_level: LevelFilter,
+
     #[command(subcommand)]
     pub action: Action,
 }
 impl CliArgs {
-    pub fn into_parts(self) -> (String, Action, BuildkiteArgs) {
+    pub fn into_parts(self) -> (String, LevelFilter, Action, BuildkiteArgs) {
         (
             self.ci_cmd,
+            self.log_level,
             self.action,
             BuildkiteArgs {
                 commit: self.commit,
