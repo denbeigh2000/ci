@@ -8,7 +8,7 @@ lazy_static::lazy_static! {
         let ci_str = std::env::var("CI");
         match ci_str.as_ref().map(|m| m.as_str()) {
             Err(_) | Ok("0") | Ok("false") | Ok("no") | Ok("n") => LevelFilter::Warn,
-            Ok(_) => LevelFilter::Info,
+            Ok(_) => LevelFilter::Debug,
         }
     };
 }
