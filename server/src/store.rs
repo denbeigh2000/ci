@@ -58,10 +58,6 @@ pub struct BuildRecord {
 
 type PostgresPool = Pool<PostgresConnectionManager<NoTls>>;
 
-pub struct Hash([char; 33]);
-
-pub struct Query(Vec<Hash>);
-
 #[derive(Clone)]
 pub struct Store {
     pool: PostgresPool,
