@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use serde::{de::Visitor, Deserialize, Serialize};
 
+mod cli;
 mod command;
 mod trigger;
 
+pub use cli::{Cli, RunError};
 pub use command::CommandStep;
 pub use trigger::TriggerStep;
 
