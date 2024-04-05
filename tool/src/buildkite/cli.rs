@@ -62,7 +62,7 @@ impl Cli {
 
     pub fn upload(self, paths: &[&str]) -> Result<(), RunError> {
         log::debug!("uploading buildkite artifacts: {}", paths.join(" "));
-        let mut args = Vec::from(["buildkite-agent", "artifact", "upload"]);
+        let mut args = Vec::from(["artifact", "upload"]);
         for path in paths {
             args.push(path);
         }
@@ -74,7 +74,7 @@ impl Cli {
 
     pub fn download(self, query: &str, dest: &str) -> Result<(), RunError> {
         log::debug!("downloading buildkite artifacts `{query}` to `{dest}`");
-        let args = ["buildkite-agent", "artifact", "download", query, dest];
+        let args = ["artifact", "download", query, dest];
         self.run(&args, None)?;
 
         Ok(())
